@@ -17,6 +17,8 @@ import routes from "@/services/routes";
 
 import { DashboardAndQueryFavoritesList } from "./components/FavoritesList";
 
+import { createBrowserHistory } from 'history';
+
 import "./Home.less";
 
 function DeprecatedEmbedFeatureAlert() {
@@ -67,31 +69,45 @@ function EmailNotVerifiedAlert() {
 }
 
 export default function Home() {
+  const history = createBrowserHistory();
   useEffect(() => {
     recordEvent("view", "page", "personal_homepage");
+
+    axios.get("api/dashboards")
+      .then(response => { 
+        if(response.length === 0){
+          history.push('/dashboards');
+          window.location.reload();
+        }      
+        const firstResult = response.results[0];
+        history.push('/dashboards/'+firstResult.id+'-'+firstResult.slug);
+        window.location.reload();
+      });
   }, []);
 
   return (
-    <div className="home-page">
-      <div className="container">
-        {includes(messages, "using-deprecated-embed-feature") && <DeprecatedEmbedFeatureAlert />}
-        {includes(messages, "email-not-verified") && <EmailNotVerifiedAlert />}
-        <DynamicComponent name="Home.EmptyState">
-          <EmptyState
-            header="Welcome to Redash 👋"
-            description="Connect to any data source, easily visualize and share your data"
-            illustration="dashboard"
-            helpMessage={<EmptyStateHelpMessage helpTriggerType="GETTING_STARTED" />}
-            showDashboardStep
-            showInviteStep
-            onboardingMode
-          />
-        </DynamicComponent>
-        <DynamicComponent name="HomeExtra" />
-        <DashboardAndQueryFavoritesList />
-        <BeaconConsent />
-      </div>
-    </div>
+    // <div className="home-page">
+    //   <div className="container">
+    //     {includes(messages, "using-deprecated-embed-feature") && <DeprecatedEmbedFeatureAlert />}
+    //     {includes(messages, "email-not-verified") && <EmailNotVerifiedAlert />}
+    //     <DynamicComponent name="Home.EmptyState">
+    //       <EmptyState
+    //         header="Welcome to Redash 👋"
+    //         description="Connect to any data source, easily visualize and share your data"
+    //         illustration="dashboard"
+    //         helpMessage={<EmptyStateHelpMessage helpTriggerType="GETTING_STARTED" />}
+    //         showDashboardStep
+    //         showInviteStep
+    //         onboardingMode
+    //       />
+    //     </DynamicComponent>
+    //     <DynamicComponent name="HomeExtra" />
+    //     <DashboardAndQueryFavoritesList />
+    //     <BeaconConsent />
+    //   </div>
+    // </div>
+    <></>
+  
   );
 }
 
@@ -103,3 +119,5 @@ routes.register(
     render: pageProps => <Home {...pageProps} />,
   })
 );
+
+

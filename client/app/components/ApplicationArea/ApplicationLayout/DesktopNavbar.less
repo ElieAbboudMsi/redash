@@ -1,4 +1,4 @@
-@backgroundColor: #001529;
+@backgroundColor: #f6f7f9;
 @dividerColor: rgba(255, 255, 255, 0.5);
 @textColor: rgba(255, 255, 255, 0.75);
 @brandColor: #ff7964; // Redash logo color
@@ -6,12 +6,13 @@
 @iconSize: 26px;
 
 .desktop-navbar {
-  background: @backgroundColor;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  background: @backgroundColor;
+  box-shadow: 0 4px 9px -3px rgba(102, 136, 153, 0.15);
+  padding: 0 15px;
   height: 100%;
-  width: 80px;
-  overflow: hidden;
 
   &-spacer {
     flex: 1 1 auto;
@@ -79,7 +80,7 @@
     .ant-menu-item,
     .ant-menu-submenu {
       padding: 0;
-      height: 60px;
+      height: 100%;
       display: flex;
       align-items: center;
       flex-direction: column;
@@ -95,7 +96,7 @@
     &.ant-menu-vertical > .ant-menu-submenu > .ant-menu-submenu-title,
     .ant-menu-submenu-title {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
       justify-content: center;
       line-height: normal;
