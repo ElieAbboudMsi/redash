@@ -1,4 +1,5 @@
 // import { includes } from "lodash";
+import Menu from "antd/lib/menu";
 import { first } from "lodash";
 import React, { useState } from "react";
 import PropTypes from "prop-types";
@@ -38,16 +39,16 @@ export default function MobileNavbar({ getPopupContainer }) {
       {currentUser.hasPermission("list_dashboards") && (
         <span className="navbar-item">
           <Link href="dashboards">
-            <DesktopOutlinedIcon style={{ color: "black" }} aria-label="Dashboard navigation button" />
-            <span style={{ color: "black" }}>Dashboards</span>
+            <DesktopOutlinedIcon style={{ color: "#6a798c", fontWeight: "bold", fontSize: "13px" }} aria-label="Dashboard navigation button" />
+            <span style={{ color: "#6a798c", fontWeight: "bold", fontSize: "13px" }}>Dashboards</span>
           </Link>
         </span>
       )}
       {currentUser.hasPermission("view_query") && (
         <span className="navbar-item">
           <Link href="queries">
-            <CodeOutlinedIcon style={{ color: "black" }} aria-label="Queries navigation button" />
-            <span style={{ color: "black" }}>Queries</span>
+            <CodeOutlinedIcon style={{ color: "#6a798c", fontWeight: "bold", fontSize: "13px" }} aria-label="Queries navigation button" />
+            <span style={{ color: "#6a798c", fontWeight: "bold", fontSize: "13px" }}>Queries</span>
           </Link>
         </span>
       )}
@@ -61,17 +62,40 @@ export default function MobileNavbar({ getPopupContainer }) {
           </span>
         )}
 
-      {(canCreateQuery || canCreateDashboard || canCreateAlert) && (
+{/* 
+        {(canCreateQuery || canCreateDashboard || canCreateAlert) && (
+          <span>
+          <Menu.SubMenu
+            key="create"
+            tabIndex={0}
+            title={
+                <span >Create</span>
+            }>
+            {canCreateQuery && (
+              <Menu.Item>
+                <Link href="queries/new">
+                  New Query
+                </Link>
+              </Menu.Item>
+            )}
+            {canCreateDashboard && (
+              <Menu.Item>
+                <PlainButton>
+                  New Dashboard
+                </PlainButton>
+              </Menu.Item>
+            )}
+          </Menu.SubMenu>
+          </span>
+        )} */}
+
+      {/* {(canCreateQuery || canCreateDashboard || canCreateAlert) && (
        <span className="submenu-title" >
        <PlusOutlinedIcon style={{ color: "black" }} />
        <span style={{ color: "black" }}  onClick={handleCreateClick} >Create</span>
      </span>
       
       )}
-
-
-
-
 
       {isSubMenuOpen && (
         <ul>
@@ -86,7 +110,7 @@ export default function MobileNavbar({ getPopupContainer }) {
             </PlainButton>
           </li>
         </ul>
-      )}
+      )} */}
 
 
 
