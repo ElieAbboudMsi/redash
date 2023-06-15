@@ -75,7 +75,7 @@ export default function Home() {
 
     axios.get("api/dashboards")
       .then(response => { 
-        if(response.length === 0){
+        if(response.count === 0){
           history.push('/dashboards');
           window.location.reload();
         }      

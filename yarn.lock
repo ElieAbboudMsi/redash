@@ -1674,10 +1674,8 @@
     schema-utils "^2.6.5"
     source-map "^0.7.3"
 
-"@redash/viz@^0.1.1":
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/@redash/viz/-/viz-0.1.1.tgz#30865f7312ce10d8607ea667da374aff0b641dea"
-  integrity sha512-JebGzaGdgdFKa8riCdEzeVJkBSLjTdpf8of9xg3OlIKtM/rPKnmAXcKNk68BIS2BLq0PNWbBhtrYckmlxcnukA==
+"@redash/viz@file:viz-lib":
+  version "1.0.0"
   dependencies:
     axios "^0.19.2"
     beautifymarker "^1.0.7"
