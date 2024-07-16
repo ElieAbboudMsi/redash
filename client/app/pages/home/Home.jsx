@@ -6,7 +6,6 @@ import Link from "@/components/Link";
 import routeWithUserSession from "@/components/ApplicationArea/routeWithUserSession";
 import EmptyState, { EmptyStateHelpMessage } from "@/components/empty-state/EmptyState";
 import DynamicComponent from "@/components/DynamicComponent";
-import BeaconConsent from "@/components/BeaconConsent";
 import PlainButton from "@/components/PlainButton";
 
 import { axios } from "@/services/axios";
@@ -17,7 +16,7 @@ import routes from "@/services/routes";
 
 import { DashboardAndQueryFavoritesList } from "./components/FavoritesList";
 
-import { createBrowserHistory } from 'history';
+import { createBrowserHistory } from "history";
 
 import "./Home.less";
 
@@ -73,16 +72,15 @@ export default function Home() {
   useEffect(() => {
     recordEvent("view", "page", "personal_homepage");
 
-    axios.get("api/dashboards")
-      .then(response => { 
-        if(response.count === 0){
-          history.push('/dashboards');
-          window.location.reload();
-        }      
-        const firstResult = response.results[0];
-        history.push('/dashboards/'+firstResult.id+'-'+firstResult.slug);
+    axios.get("api/dashboards").then(response => {
+      if (response.count === 0) {
+        history.push("/dashboards");
         window.location.reload();
-      });
+      }
+      const firstResult = response.results[0];
+      history.push("/dashboards/" + firstResult.id + "-" + firstResult.slug);
+      window.location.reload();
+    });
   }, []);
 
   return (
@@ -107,7 +105,6 @@ export default function Home() {
     //   </div>
     // </div>
     <></>
-  
   );
 }
 
@@ -119,5 +116,3 @@ routes.register(
     render: pageProps => <Home {...pageProps} />,
   })
 );
-
-
