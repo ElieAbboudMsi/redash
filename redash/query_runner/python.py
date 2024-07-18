@@ -3,42 +3,25 @@ import importlib
 import logging
 import sys
 
-from RestrictedPython import compile_restricted
-from RestrictedPython.Guards import (
-    guarded_iter_unpack_sequence,
-    guarded_unpack_sequence,
-    safe_builtins,
-)
-from RestrictedPython.transformer import IOPERATOR_TO_STR
-
+from redash.query_runner import *
+from redash.utils import json_dumps, json_loads
 from redash import models
-from redash.query_runner import (
-    SUPPORTED_COLUMN_TYPES,
-    TYPE_BOOLEAN,
-    TYPE_DATE,
-    TYPE_DATETIME,
-    TYPE_FLOAT,
-    TYPE_INTEGER,
-    TYPE_STRING,
-    BaseQueryRunner,
-    register,
-)
-from redash.utils.pandas import pandas_installed
+from RestrictedPython import compile_restricted
+from RestrictedPython.Guards import safe_builtins, guarded_iter_unpack_sequence, guarded_unpack_sequence
 
-if pandas_installed:
+try:
     import pandas as pd
+    import numpy as np
+    pandas_installed = True
+except ImportError:
+    pandas_installed = False
 
-    from redash.utils.pandas import pandas_to_result
-
-    enabled = True
-else:
-    enabled = False
-
+from RestrictedPython.transformer import IOPERATOR_TO_STR
 
 logger = logging.getLogger(__name__)
 
 
-class CustomPrint:
+class CustomPrint(object):
     """CustomPrint redirect "print" calls to be sent as "log" on the result object."""
 
     def __init__(self):
@@ -48,7 +31,9 @@ class CustomPrint:
     def write(self, text):
         if self.enabled:
             if text and text.strip():
-                log_line = "[{0}] {1}".format(datetime.datetime.utcnow().isoformat(), text)
+                log_line = "[{0}] {1}".format(
+                    datetime.datetime.utcnow().isoformat(), text
+                )
                 self.lines.append(log_line)
 
     def enable(self):
@@ -135,7 +120,7 @@ class Python(BaseQueryRunner):
         if self.configuration.get("additionalBuiltins", None):
             for b in self.configuration["additionalBuiltins"].split(","):
                 if b not in self.safe_builtins:
-                    self.safe_builtins += (b,)
+                    self.safe_builtins += (b, )
 
     def custom_import(self, name, globals=None, locals=None, fromlist=(), level=0):
         if name in self._allowed_modules:
@@ -148,7 +133,9 @@ class Python(BaseQueryRunner):
 
             return m
 
-        raise Exception("'{0}' is not configured as a supported import module".format(name))
+        raise Exception(
+            "'{0}' is not configured as a supported import module".format(name)
+        )
 
     @staticmethod
     def custom_write(obj):
@@ -190,7 +177,9 @@ class Python(BaseQueryRunner):
         if "columns" not in result:
             result["columns"] = []
 
-        result["columns"].append({"name": column_name, "friendly_name": friendly_name, "type": column_type})
+        result["columns"].append(
+            {"name": column_name, "friendly_name": friendly_name, "type": column_type}
+        )
 
     @staticmethod
     def add_result_row(result, values):
@@ -214,7 +203,7 @@ class Python(BaseQueryRunner):
         :query string: Query to run
         """
         try:
-            if isinstance(data_source_name_or_id, int):
+            if type(data_source_name_or_id) == int:
                 data_source = models.DataSource.get_by_id(data_source_name_or_id)
             else:
                 data_source = models.DataSource.get_by_name(data_source_name_or_id)
@@ -227,12 +216,13 @@ class Python(BaseQueryRunner):
             raise Exception(error)
 
         # TODO: allow avoiding the JSON dumps/loads in same process
-        query_result = data
+        query_result = json_loads(data)
 
         if result_type == "dataframe" and pandas_installed:
             return pd.DataFrame(query_result["rows"])
 
         return query_result
+
 
     @staticmethod
     def get_source_schema(data_source_name_or_id):
@@ -242,7 +232,7 @@ class Python(BaseQueryRunner):
         :return:
         """
         try:
-            if isinstance(data_source_name_or_id, int):
+            if type(data_source_name_or_id) == int:
                 data_source = models.DataSource.get_by_id(data_source_name_or_id)
             else:
                 data_source = models.DataSource.get_by_name(data_source_name_or_id)
@@ -272,36 +262,33 @@ class Python(BaseQueryRunner):
         return query.latest_query_data.data
 
     def dataframe_to_result(self, result, df):
-        converted_result = pandas_to_result(df)
 
-        result["rows"] = converted_result["rows"]
-        for column in converted_result["columns"]:
-            self.add_result_column(result, column["name"], column["friendly_name"], column["type"])
+        result["rows"] = df.to_dict("records")
+
+        for column_name, column_type in df.dtypes.items():
+            if column_type == np.bool:
+                redash_type = TYPE_BOOLEAN
+            elif column_type == np.inexact:
+                redash_type = TYPE_FLOAT
+            elif column_type == np.integer:
+                redash_type = TYPE_INTEGER
+            elif column_type in (np.datetime64, np.dtype('<M8[ns]')):
+                if df.empty:
+                    redash_type = TYPE_DATETIME
+                elif len(df[column_name].head(1).astype(str).loc[0]) > 10:
+                    redash_type = TYPE_DATETIME
+                else:
+                    redash_type = TYPE_DATE
+            else:
+                redash_type = TYPE_STRING
+
+            self.add_result_column(result, column_name, column_name, redash_type)
 
     def get_current_user(self):
         return self._current_user.to_dict()
 
     def test_connection(self):
         pass
-
-    def validate_result(self, result):
-        """Validate the result after executing the query.
-
-        Parameters:
-        :result dict: The result dict.
-        """
-        if not result:
-            raise Exception("local variable `result` should not be empty.")
-        if not isinstance(result, dict):
-            raise Exception("local variable `result` should be of type `dict`.")
-        if "rows" not in result:
-            raise Exception("Missing `rows` field in `result` dict.")
-        if "columns" not in result:
-            raise Exception("Missing `columns` field in `result` dict.")
-        if not isinstance(result["rows"], list):
-            raise Exception("`rows` field should be of type `list`.")
-        if not isinstance(result["columns"], list):
-            raise Exception("`columns` field should be of type `list`.")
 
     def run_query(self, query, user):
         self._current_user = user
@@ -356,14 +343,13 @@ class Python(BaseQueryRunner):
 
             exec(code, restricted_globals, self._script_locals)
 
-            data = self._script_locals["result"]
-            self.validate_result(data)
-            data["log"] = self._custom_print.lines
+            result = self._script_locals["result"]
+            result["log"] = self._custom_print.lines
+            json_data = json_dumps(result)
         except Exception as e:
             error = str(type(e)) + " " + str(e)
-            data = None
+            json_data = None
 
-        return data, error
-
+        return json_data, error
 
 register(Python)

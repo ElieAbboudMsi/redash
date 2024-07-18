@@ -15,7 +15,6 @@ import ShareDashboardDialog from "../components/ShareDashboardDialog";
 import useFullscreenHandler from "../../../lib/hooks/useFullscreenHandler";
 import useRefreshRateHandler from "./useRefreshRateHandler";
 import useEditModeHandler from "./useEditModeHandler";
-import useDuplicateDashboard from "./useDuplicateDashboard";
 import { policy } from "@/services/policy";
 
 export { DashboardStatusEnum } from "./useEditModeHandler";
@@ -53,8 +52,6 @@ function useDashboard(dashboardData) {
     () => every(dashboard.widgets, w => (w.getQuery() ? w.getQuery().is_safe : true)),
     [dashboard]
   );
-
-  const [isDuplicating, duplicateDashboard] = useDuplicateDashboard(dashboard);
 
   const managePermissions = useCallback(() => {
     const aclUrl = `api/dashboards/${dashboard.id}/acl`;
@@ -246,8 +243,6 @@ function useDashboard(dashboardData) {
     showAddTextboxDialog,
     showAddWidgetDialog,
     managePermissions,
-    isDuplicating,
-    duplicateDashboard,
   };
 }
 

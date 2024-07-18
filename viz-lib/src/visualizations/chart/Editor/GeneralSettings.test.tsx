@@ -212,21 +212,4 @@ describe("Visualizations -> Chart -> Editor -> General Settings", () => {
       .find("input")
       .simulate("change", { target: { checked: true } });
   });
-
-  test("Toggles Enable click events", done => {
-    const el = mount(
-      {
-        globalSeriesType: "column",
-        series: {},
-      },
-      done
-    );
-
-    findByTestID(el, "Chart.EnableClickEvents")
-      .last()
-      .find("input")
-      .simulate("change", { target: { checked: true } });
-  });
-
-  
 });

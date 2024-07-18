@@ -1,7 +1,6 @@
 """
 Some test cases around the Glue catalog.
 """
-
 from unittest import TestCase
 
 import botocore
@@ -13,6 +12,7 @@ from redash.query_runner.athena import Athena
 
 class TestGlueSchema(TestCase):
     def setUp(self):
+
         client = botocore.session.get_session().create_client(
             "glue",
             region_name="mars-east-1",
@@ -32,7 +32,9 @@ class TestGlueSchema(TestCase):
         """Unpartitioned table crawled through a JDBC connection"""
         query_runner = Athena({"glue": True, "region": "mars-east-1"})
 
-        self.stubber.add_response("get_databases", {"DatabaseList": [{"Name": "test1"}]}, {})
+        self.stubber.add_response(
+            "get_databases", {"DatabaseList": [{"Name": "test1"}]}, {}
+        )
         self.stubber.add_response(
             "get_tables",
             {
@@ -75,7 +77,9 @@ class TestGlueSchema(TestCase):
             {"DatabaseName": "test1"},
         )
         with self.stubber:
-            assert query_runner.get_schema() == [{"columns": ["row_id"], "name": "test1.jdbc_table"}]
+            assert query_runner.get_schema() == [
+                {"columns": ["row_id"], "name": "test1.jdbc_table"}
+            ]
 
     def test_partitioned_table(self):
         """
@@ -84,7 +88,9 @@ class TestGlueSchema(TestCase):
 
         query_runner = Athena({"glue": True, "region": "mars-east-1"})
 
-        self.stubber.add_response("get_databases", {"DatabaseList": [{"Name": "test1"}]}, {})
+        self.stubber.add_response(
+            "get_databases", {"DatabaseList": [{"Name": "test1"}]}, {}
+        )
         self.stubber.add_response(
             "get_tables",
             {
@@ -124,12 +130,16 @@ class TestGlueSchema(TestCase):
             {"DatabaseName": "test1"},
         )
         with self.stubber:
-            assert query_runner.get_schema() == [{"columns": ["sk", "category"], "name": "test1.partitioned_table"}]
+            assert query_runner.get_schema() == [
+                {"columns": ["sk", "category"], "name": "test1.partitioned_table"}
+            ]
 
     def test_view(self):
         query_runner = Athena({"glue": True, "region": "mars-east-1"})
 
-        self.stubber.add_response("get_databases", {"DatabaseList": [{"Name": "test1"}]}, {})
+        self.stubber.add_response(
+            "get_databases", {"DatabaseList": [{"Name": "test1"}]}, {}
+        )
         self.stubber.add_response(
             "get_tables",
             {
@@ -156,7 +166,9 @@ class TestGlueSchema(TestCase):
             {"DatabaseName": "test1"},
         )
         with self.stubber:
-            assert query_runner.get_schema() == [{"columns": ["sk"], "name": "test1.view"}]
+            assert query_runner.get_schema() == [
+                {"columns": ["sk"], "name": "test1.view"}
+            ]
 
     def test_dodgy_table_does_not_break_schema_listing(self):
         """
@@ -166,7 +178,9 @@ class TestGlueSchema(TestCase):
         """
         query_runner = Athena({"glue": True, "region": "mars-east-1"})
 
-        self.stubber.add_response("get_databases", {"DatabaseList": [{"Name": "test1"}]}, {})
+        self.stubber.add_response(
+            "get_databases", {"DatabaseList": [{"Name": "test1"}]}, {}
+        )
         self.stubber.add_response(
             "get_tables",
             {
@@ -196,28 +210,32 @@ class TestGlueSchema(TestCase):
             {"DatabaseName": "test1"},
         )
         with self.stubber:
-            assert query_runner.get_schema() == [{"columns": ["region"], "name": "test1.csv"}]
+            assert query_runner.get_schema() == [
+                {"columns": ["region"], "name": "test1.csv"}
+            ]
 
     def test_no_storage_descriptor_table(self):
         """
         For some reason, not all Glue tables contain a "StorageDescriptor" entry.
         """
-        query_runner = Athena({"glue": True, "region": "mars-east-1"})
+        query_runner = Athena({'glue': True, 'region': 'mars-east-1'})
 
-        self.stubber.add_response("get_databases", {"DatabaseList": [{"Name": "test1"}]}, {})
+        self.stubber.add_response('get_databases', {'DatabaseList': [{'Name': 'test1'}]}, {})
         self.stubber.add_response(
-            "get_tables",
+            'get_tables',
             {
-                "TableList": [
+                'TableList': [
                     {
-                        "Name": "no_storage_descriptor_table",
-                        "PartitionKeys": [],
-                        "TableType": "EXTERNAL_TABLE",
-                        "Parameters": {"EXTERNAL": "TRUE"},
+                        'Name': 'no_storage_descriptor_table',
+                        'PartitionKeys': [],
+                        'TableType': 'EXTERNAL_TABLE',
+                        'Parameters': {
+                            'EXTERNAL': 'TRUE'
+                        },
                     }
                 ]
             },
-            {"DatabaseName": "test1"},
+            {'DatabaseName': 'test1'},
         )
         with self.stubber:
             assert query_runner.get_schema() == []

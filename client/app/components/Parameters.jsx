@@ -1,4 +1,4 @@
-import { size, filter, forEach, extend, isEmpty } from "lodash";
+import { size, filter, forEach, extend } from "lodash";
 import React from "react";
 import PropTypes from "prop-types";
 import { SortableContainer, SortableElement, DragHandle } from "@redash/viz/lib/components/sortable";
@@ -43,23 +43,13 @@ export default class Parameters extends React.Component {
     appendSortableToParent: true,
   };
 
-  toCamelCase = str => {
-    if (isEmpty(str)) {
-      return "";
-    }
-    return str.replace(/\s+/g, "").toLowerCase();
-  };
-
   constructor(props) {
     super(props);
-    const { parameters, disableUrlUpdate } = props;
+    const { parameters } = props;
     this.state = { parameters };
-    if (!disableUrlUpdate) {
+    if (!props.disableUrlUpdate) {
       updateUrl(parameters);
     }
-    const hideRegex = /hide_filter=([^&]+)/g;
-    const matches = window.location.search.matchAll(hideRegex);
-    this.hideValues = Array.from(matches, match => match[1]);
   }
 
   componentDidUpdate = prevProps => {
@@ -132,13 +122,7 @@ export default class Parameters extends React.Component {
   };
 
   renderParameter(param, index) {
-    if (this.hideValues.some(value => this.toCamelCase(value) === this.toCamelCase(param.name))) {
-      return null;
-    }
     const { editable } = this.props;
-    if (param.hidden) {
-      return null;
-    }
     return (
       <div key={param.name} className="di-block" data-test={`ParameterName-${param.name}`}>
         <div className="parameter-heading">
@@ -154,7 +138,6 @@ export default class Parameters extends React.Component {
             </PlainButton>
           )}
         </div>
-
         <ParameterValueInput
           type={param.type}
           value={param.normalizedValue}
@@ -171,6 +154,7 @@ export default class Parameters extends React.Component {
     const { parameters } = this.state;
     const { sortable, appendSortableToParent } = this.props;
     const dirtyParamCount = size(filter(parameters, "hasPendingValue"));
+
     return (
       <SortableContainer
         disabled={!sortable}
@@ -185,18 +169,17 @@ export default class Parameters extends React.Component {
           className: "parameter-container",
           onKeyDown: dirtyParamCount ? this.handleKeyDown : null,
         }}>
-        {parameters &&
-          parameters.map((param, index) => (
-            <SortableElement key={param.name} index={index}>
-              <div
-                className="parameter-block"
-                data-editable={sortable || null}
-                data-test={`ParameterBlock-${param.name}`}>
-                {sortable && <DragHandle data-test={`DragHandle-${param.name}`} />}
-                {this.renderParameter(param, index)}
-              </div>
-            </SortableElement>
-          ))}
+        {parameters.map((param, index) => (
+          <SortableElement key={param.name} index={index}>
+            <div
+              className="parameter-block"
+              data-editable={sortable || null}
+              data-test={`ParameterBlock-${param.name}`}>
+              {sortable && <DragHandle data-test={`DragHandle-${param.name}`} />}
+              {this.renderParameter(param, index)}
+            </div>
+          </SortableElement>
+        ))}
         <ParameterApplyButton onClick={this.applyChanges} paramCount={dirtyParamCount} />
       </SortableContainer>
     );

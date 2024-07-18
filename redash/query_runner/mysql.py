@@ -3,17 +3,18 @@ import os
 import threading
 
 from redash.query_runner import (
-    TYPE_DATE,
-    TYPE_DATETIME,
     TYPE_FLOAT,
     TYPE_INTEGER,
+    TYPE_DATETIME,
     TYPE_STRING,
+    TYPE_DATE,
     BaseSQLQueryRunner,
     InterruptException,
     JobTimeoutException,
     register,
 )
 from redash.settings import parse_boolean
+from redash.utils import json_dumps, json_loads
 
 try:
     import MySQLdb
@@ -43,7 +44,7 @@ types_map = {
 }
 
 
-class Result:
+class Result(object):
     def __init__(self):
         pass
 
@@ -53,7 +54,9 @@ class Mysql(BaseSQLQueryRunner):
 
     @classmethod
     def configuration_schema(cls):
-        show_ssl_settings = parse_boolean(os.environ.get("MYSQL_SHOW_SSL_SETTINGS", "true"))
+        show_ssl_settings = parse_boolean(
+            os.environ.get("MYSQL_SHOW_SSL_SETTINGS", "true")
+        )
 
         schema = {
             "type": "object",
@@ -66,19 +69,8 @@ class Mysql(BaseSQLQueryRunner):
                 "connect_timeout": {"type": "number", "default": 60, "title": "Connection Timeout"},
                 "charset": {"type": "string", "default": "utf8"},
                 "use_unicode": {"type": "boolean", "default": True},
-                "autocommit": {"type": "boolean", "default": False},
             },
-            "order": [
-                "host",
-                "port",
-                "user",
-                "passwd",
-                "db",
-                "connect_timeout",
-                "charset",
-                "use_unicode",
-                "autocommit",
-            ],
+            "order": ["host", "port", "user", "passwd", "db", "connect_timeout", "charset", "use_unicode"],
             "required": ["db"],
             "secret": ["passwd"],
         }
@@ -86,18 +78,6 @@ class Mysql(BaseSQLQueryRunner):
         if show_ssl_settings:
             schema["properties"].update(
                 {
-                    "ssl_mode": {
-                        "type": "string",
-                        "title": "SSL Mode",
-                        "default": "preferred",
-                        "extendedEnum": [
-                            {"value": "disabled", "name": "Disabled"},
-                            {"value": "preferred", "name": "Preferred"},
-                            {"value": "required", "name": "Required"},
-                            {"value": "verify-ca", "name": "Verify CA"},
-                            {"value": "verify-identity", "name": "Verify Identity"},
-                        ],
-                    },
                     "use_ssl": {"type": "boolean", "title": "Use SSL"},
                     "ssl_cacert": {
                         "type": "string",
@@ -134,7 +114,6 @@ class Mysql(BaseSQLQueryRunner):
             charset=self.configuration.get("charset", "utf8"),
             use_unicode=self.configuration.get("use_unicode", True),
             connect_timeout=self.configuration.get("connect_timeout", 60),
-            autocommit=self.configuration.get("autocommit", True),
         )
 
         ssl_options = self._get_ssl_parameters()
@@ -160,6 +139,8 @@ class Mysql(BaseSQLQueryRunner):
         if error is not None:
             self._handle_run_query_error(error)
 
+        results = json_loads(results)
+
         for row in results["rows"]:
             if row["table_schema"] != self.configuration["db"]:
                 table_name = "{}.{}".format(row["table_schema"], row["table_name"])
@@ -173,6 +154,7 @@ class Mysql(BaseSQLQueryRunner):
 
         return list(schema.values())
 
+
     def run_query(self, query, user):
         ev = threading.Event()
         thread_id = ""
@@ -182,7 +164,9 @@ class Mysql(BaseSQLQueryRunner):
         try:
             connection = self._connection()
             thread_id = connection.thread_id()
-            t = threading.Thread(target=self._run_query, args=(query, user, connection, r, ev))
+            t = threading.Thread(
+                target=self._run_query, args=(query, user, connection, r, ev)
+            )
             t.start()
             while not ev.wait(1):
                 pass
@@ -191,7 +175,7 @@ class Mysql(BaseSQLQueryRunner):
             t.join()
             raise
 
-        return r.data, r.error
+        return r.json_data, r.error
 
     def _run_query(self, query, user, connection, r, ev):
         try:
@@ -209,21 +193,26 @@ class Mysql(BaseSQLQueryRunner):
 
             # TODO - very similar to pg.py
             if desc is not None:
-                columns = self.fetch_columns([(i[0], types_map.get(i[1], None)) for i in desc])
-                rows = [dict(zip((column["name"] for column in columns), row)) for row in data]
+                columns = self.fetch_columns(
+                    [(i[0], types_map.get(i[1], None)) for i in desc]
+                )
+                rows = [
+                    dict(zip((column["name"] for column in columns), row))
+                    for row in data
+                ]
 
                 data = {"columns": columns, "rows": rows}
-                r.data = data
+                r.json_data = json_dumps(data)
                 r.error = None
             else:
-                r.data = None
+                r.json_data = None
                 r.error = "No data was returned."
 
             cursor.close()
         except MySQLdb.Error as e:
             if cursor:
                 cursor.close()
-            r.data = None
+            r.json_data = None
             r.error = e.args[1]
         finally:
             ev.set()
@@ -237,7 +226,7 @@ class Mysql(BaseSQLQueryRunner):
         ssl_params = {}
 
         if self.configuration.get("use_ssl"):
-            config_map = {"ssl_mode": "preferred", "ssl_cacert": "ca", "ssl_cert": "cert", "ssl_key": "key"}
+            config_map = {"ssl_cacert": "ca", "ssl_cert": "cert", "ssl_key": "key"}
             for key, cfg in config_map.items():
                 val = self.configuration.get(key)
                 if val:
@@ -295,7 +284,9 @@ class RDSMySQL(Mysql):
 
     def _get_ssl_parameters(self):
         if self.configuration.get("use_ssl"):
-            ca_path = os.path.join(os.path.dirname(__file__), "./files/rds-combined-ca-bundle.pem")
+            ca_path = os.path.join(
+                os.path.dirname(__file__), "./files/rds-combined-ca-bundle.pem"
+            )
             return {"ca": ca_path}
 
         return None

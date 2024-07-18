@@ -1,31 +1,23 @@
 import datetime
 import logging
-import socket
+import sys
 import time
 from base64 import b64decode
 
+import httplib2
+import requests
+
 from redash import settings
-from redash.query_runner import (
-    TYPE_BOOLEAN,
-    TYPE_DATETIME,
-    TYPE_FLOAT,
-    TYPE_INTEGER,
-    TYPE_STRING,
-    BaseQueryRunner,
-    InterruptException,
-    JobTimeoutException,
-    register,
-)
-from redash.utils import json_loads
+from redash.query_runner import *
+from redash.utils import json_dumps, json_loads
 
 logger = logging.getLogger(__name__)
 
 try:
     import apiclient.errors
-    import google.auth
     from apiclient.discovery import build
-    from apiclient.errors import HttpError  # noqa: F401
-    from google.oauth2.service_account import Credentials
+    from apiclient.errors import HttpError
+    from oauth2client.service_account import ServiceAccountCredentials
 
     enabled = True
 except ImportError:
@@ -60,7 +52,9 @@ def transform_row(row, fields):
     for column_index, cell in enumerate(row["f"]):
         field = fields[column_index]
         if field.get("mode") == "REPEATED":
-            cell_value = [transform_cell(field["type"], item["v"]) for item in cell["v"]]
+            cell_value = [
+                transform_cell(field["type"], item["v"]) for item in cell["v"]
+            ]
         else:
             cell_value = transform_cell(field["type"], cell["v"])
 
@@ -70,7 +64,7 @@ def transform_row(row, fields):
 
 
 def _load_key(filename):
-    f = open(filename, "rb")
+    f = file(filename, "rb")
     try:
         return f.read()
     finally:
@@ -96,11 +90,8 @@ def _get_total_bytes_processed_for_resp(bq_response):
 
 
 class BigQuery(BaseQueryRunner):
+    should_annotate_query = False
     noop_query = "SELECT 1"
-
-    def __init__(self, configuration):
-        super().__init__(configuration)
-        self.should_annotate_query = configuration.get("useQueryAnnotation", False)
 
     @classmethod
     def enabled(cls):
@@ -112,7 +103,7 @@ class BigQuery(BaseQueryRunner):
             "type": "object",
             "properties": {
                 "projectId": {"type": "string", "title": "Project ID"},
-                "jsonKeyFile": {"type": "string", "title": "JSON Key File (ADC is used if omitted)"},
+                "jsonKeyFile": {"type": "string", "title": "JSON Key File"},
                 "totalMBytesProcessedLimit": {
                     "type": "number",
                     "title": "Scanned Data Limit (MB)",
@@ -132,13 +123,8 @@ class BigQuery(BaseQueryRunner):
                     "type": "number",
                     "title": "Maximum Billing Tier",
                 },
-                "useQueryAnnotation": {
-                    "type": "boolean",
-                    "title": "Use Query Annotation",
-                    "default": False,
-                },
             },
-            "required": ["projectId"],
+            "required": ["jsonKeyFile", "projectId"],
             "order": [
                 "projectId",
                 "jsonKeyFile",
@@ -148,26 +134,23 @@ class BigQuery(BaseQueryRunner):
                 "totalMBytesProcessedLimit",
                 "maximumBillingTier",
                 "userDefinedFunctionResourceUri",
-                "useQueryAnnotation",
             ],
             "secret": ["jsonKeyFile"],
         }
 
     def _get_bigquery_service(self):
-        socket.setdefaulttimeout(settings.BIGQUERY_HTTP_TIMEOUT)
-
-        scopes = [
+        scope = [
             "https://www.googleapis.com/auth/bigquery",
             "https://www.googleapis.com/auth/drive",
         ]
 
-        try:
-            key = json_loads(b64decode(self.configuration["jsonKeyFile"]))
-            creds = Credentials.from_service_account_info(key, scopes=scopes)
-        except KeyError:
-            creds = google.auth.default(scopes=scopes)[0]
+        key = json_loads(b64decode(self.configuration["jsonKeyFile"]))
 
-        return build("bigquery", "v2", credentials=creds, cache_discovery=False)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(key, scope)
+        http = httplib2.Http(timeout=settings.BIGQUERY_HTTP_TIMEOUT)
+        http = creds.authorize(http)
+
+        return build("bigquery", "v2", http=http, cache_discovery=False)
 
     def _get_project_id(self):
         return self.configuration["projectId"]
@@ -197,13 +180,17 @@ class BigQuery(BaseQueryRunner):
             job_data["configuration"]["query"]["useLegacySql"] = False
 
         if self.configuration.get("userDefinedFunctionResourceUri"):
-            resource_uris = self.configuration["userDefinedFunctionResourceUri"].split(",")
+            resource_uris = self.configuration["userDefinedFunctionResourceUri"].split(
+                ","
+            )
             job_data["configuration"]["query"]["userDefinedFunctionResources"] = [
                 {"resourceUri": resource_uri} for resource_uri in resource_uris
             ]
 
         if "maximumBillingTier" in self.configuration:
-            job_data["configuration"]["query"]["maximumBillingTier"] = self.configuration["maximumBillingTier"]
+            job_data["configuration"]["query"][
+                "maximumBillingTier"
+            ] = self.configuration["maximumBillingTier"]
 
         return job_data
 
@@ -246,7 +233,9 @@ class BigQuery(BaseQueryRunner):
             {
                 "name": f["name"],
                 "friendly_name": f["name"],
-                "type": "string" if f.get("mode") == "REPEATED" else types_map.get(f["type"], "string"),
+                "type": "string"
+                if f.get("mode") == "REPEATED"
+                else types_map.get(f["type"], "string"),
             }
             for f in query_reply["schema"]["fields"]
         ]
@@ -284,12 +273,12 @@ class BigQuery(BaseQueryRunner):
 
         datasets = service.datasets().list(projectId=project_id).execute()
         result.extend(datasets.get("datasets", []))
-        nextPageToken = datasets.get("nextPageToken", None)
+        nextPageToken = datasets.get('nextPageToken', None)
 
         while nextPageToken is not None:
             datasets = service.datasets().list(projectId=project_id, pageToken=nextPageToken).execute()
             result.extend(datasets.get("datasets", []))
-            nextPageToken = datasets.get("nextPageToken", None)
+            nextPageToken = datasets.get('nextPageToken', None)
 
         return result
 
@@ -301,8 +290,8 @@ class BigQuery(BaseQueryRunner):
         datasets = self._get_project_datasets(project_id)
 
         query_base = """
-        SELECT table_schema, table_name, field_path
-        FROM `{dataset_id}`.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
+        SELECT table_schema, table_name, column_name
+        FROM `{dataset_id}`.INFORMATION_SCHEMA.COLUMNS
         WHERE table_schema NOT IN ('information_schema')
         """
 
@@ -313,16 +302,17 @@ class BigQuery(BaseQueryRunner):
             query = query_base.format(dataset_id=dataset_id)
             queries.append(query)
 
-        query = "\nUNION ALL\n".join(queries)
+        query = '\nUNION ALL\n'.join(queries)
         results, error = self.run_query(query, None)
         if error is not None:
             self._handle_run_query_error(error)
 
+        results = json_loads(results)
         for row in results["rows"]:
             table_name = "{0}.{1}".format(row["table_schema"], row["table_name"])
             if table_name not in schema:
                 schema[table_name] = {"name": table_name, "columns": []}
-            schema[table_name]["columns"].append(row["field_path"])
+            schema[table_name]["columns"].append(row["column_name"])
 
         return list(schema.values())
 
@@ -335,18 +325,22 @@ class BigQuery(BaseQueryRunner):
         try:
             if "totalMBytesProcessedLimit" in self.configuration:
                 limitMB = self.configuration["totalMBytesProcessedLimit"]
-                processedMB = self._get_total_bytes_processed(jobs, query) / 1000.0 / 1000.0
+                processedMB = (
+                    self._get_total_bytes_processed(jobs, query) / 1000.0 / 1000.0
+                )
                 if limitMB < processedMB:
                     return (
                         None,
-                        "Larger than %d MBytes will be processed (%f MBytes)" % (limitMB, processedMB),
+                        "Larger than %d MBytes will be processed (%f MBytes)"
+                        % (limitMB, processedMB),
                     )
 
             data = self._get_query_result(jobs, query)
             error = None
 
+            json_data = json_dumps(data, ignore_nan=True)
         except apiclient.errors.HttpError as e:
-            data = None
+            json_data = None
             if e.resp.status in [400, 404]:
                 error = json_loads(e.content)["error"]["message"]
             else:
@@ -361,7 +355,7 @@ class BigQuery(BaseQueryRunner):
 
             raise
 
-        return data, error
+        return json_data, error
 
 
 register(BigQuery)

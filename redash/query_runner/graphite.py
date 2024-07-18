@@ -3,13 +3,8 @@ import logging
 
 import requests
 
-from redash.query_runner import (
-    TYPE_DATETIME,
-    TYPE_FLOAT,
-    TYPE_STRING,
-    BaseQueryRunner,
-    register,
-)
+from redash.query_runner import *
+from redash.utils import json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +29,8 @@ def _transform_result(response):
                 }
             )
 
-    return {"columns": columns, "rows": rows}
+    data = {"columns": columns, "rows": rows}
+    return json_dumps(data)
 
 
 class Graphite(BaseQueryRunner):
@@ -73,7 +69,11 @@ class Graphite(BaseQueryRunner):
             verify=self.verify,
         )
         if r.status_code != 200:
-            raise Exception("Got invalid response from Graphite (http status code: {0}).".format(r.status_code))
+            raise Exception(
+                "Got invalid response from Graphite (http status code: {0}).".format(
+                    r.status_code
+                )
+            )
 
     def run_query(self, query, user):
         url = "%s%s" % (self.base_url, "&".join(query.split("\n")))

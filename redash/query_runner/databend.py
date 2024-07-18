@@ -1,21 +1,14 @@
 try:
-    import re
-
     from databend_sqlalchemy import connector
+    import re
 
     enabled = True
 except ImportError:
     enabled = False
 
-from redash.query_runner import (
-    TYPE_DATE,
-    TYPE_DATETIME,
-    TYPE_FLOAT,
-    TYPE_INTEGER,
-    TYPE_STRING,
-    BaseQueryRunner,
-    register,
-)
+from redash.query_runner import BaseQueryRunner, register
+from redash.query_runner import TYPE_STRING, TYPE_INTEGER, TYPE_BOOLEAN, TYPE_FLOAT, TYPE_DATETIME, TYPE_DATE
+from redash.utils import json_dumps, json_loads
 
 
 class Databend(BaseQueryRunner):
@@ -79,15 +72,20 @@ class Databend(BaseQueryRunner):
 
         try:
             cursor.execute(query)
-            columns = self.fetch_columns([(i[0], self._define_column_type(i[1])) for i in cursor.description])
-            rows = [dict(zip((column["name"] for column in columns), row)) for row in cursor]
+            columns = self.fetch_columns(
+                [(i[0], self._define_column_type(i[1])) for i in cursor.description]
+            )
+            rows = [
+                dict(zip((column["name"] for column in columns), row)) for row in cursor
+            ]
 
             data = {"columns": columns, "rows": rows}
             error = None
+            json_data = json_dumps(data)
         finally:
             connection.close()
 
-        return data, error
+        return json_data, error
 
     def get_schema(self, get_stats=False):
         query = """
@@ -104,6 +102,7 @@ class Databend(BaseQueryRunner):
             self._handle_run_query_error(error)
 
         schema = {}
+        results = json_loads(results)
 
         for row in results["rows"]:
             table_name = "{}.{}".format(row["table_schema"], row["table_name"])
@@ -130,6 +129,7 @@ class Databend(BaseQueryRunner):
             self._handle_run_query_error(error)
 
         schema = {}
+        results = json_loads(results)
 
         for row in results["rows"]:
             table_name = "{}.{}".format(row["table_schema"], row["table_name"])

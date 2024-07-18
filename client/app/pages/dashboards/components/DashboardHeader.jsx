@@ -119,8 +119,6 @@ function DashboardMoreOptionsButton({ dashboardConfiguration }) {
     managePermissions,
     gridDisabled,
     isDashboardOwnerOrAdmin,
-    isDuplicating,
-    duplicateDashboard,
   } = dashboardConfiguration;
 
   const archive = () => {
@@ -144,14 +142,6 @@ function DashboardMoreOptionsButton({ dashboardConfiguration }) {
           <Menu.Item className={cx({ hidden: gridDisabled })}>
             <PlainButton onClick={() => setEditingLayout(true)}>Edit</PlainButton>
           </Menu.Item>
-          {!isDuplicating && dashboard.canEdit() && (
-            <Menu.Item>
-              <PlainButton onClick={duplicateDashboard}>
-                Fork <i className="fa fa-external-link m-l-5" aria-hidden="true" />
-                <span className="sr-only">(opens in a new tab)</span>
-              </PlainButton>
-            </Menu.Item>
-          )}
           {clientConfig.showPermissionsControl && isDashboardOwnerOrAdmin && (
             <Menu.Item>
               <PlainButton onClick={managePermissions}>Manage Permissions</PlainButton>
