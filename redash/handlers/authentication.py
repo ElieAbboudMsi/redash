@@ -17,6 +17,9 @@ from redash.handlers import routes
 from redash.handlers.base import json_response, org_scoped_rule
 from redash.version_check import get_latest_version
 from sqlalchemy.orm.exc import NoResultFound
+from redash.settings.organization import settings as org_settings
+from redash.authentication import jwt_token_load_user_from_request
+from redash.authentication import create_and_login_user, logout_and_redirect_to_index,get_next_path
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +188,7 @@ def verification_email(org_slug=None):
 @routes.route(org_scoped_rule("/login"), methods=["GET", "POST"])
 @limiter.limit(settings.THROTTLE_LOGIN_PATTERN)
 def login(org_slug=None):
+
     # We intentionally use == as otherwise it won't actually use the proxy. So weird :O
     # noinspection PyComparisonWithNone
     if current_org == None and not settings.MULTI_ORG:
@@ -197,7 +201,6 @@ def login(org_slug=None):
     next_path = get_next_path(unsafe_next_path)
     if current_user.is_authenticated:
         return redirect(next_path)
-
 
     if request.method == "POST" and current_org.get_setting("auth_password_login_enabled"):
         try:
@@ -217,9 +220,10 @@ def login(org_slug=None):
             flash("Wrong email or password.")
     elif request.method == "POST" and not current_org.get_setting("auth_password_login_enabled"):
         flash("Password login is not enabled for your organization.")
-
-
-
+    elif request.method == "GET" and request.args.get('token'):
+        user = jwt_token_load_user_from_request(request)
+        if user is None:
+            return logout_and_redirect_to_index()
     google_auth_url = get_google_auth_url(next_path)
 
     return render_template(
@@ -234,8 +238,6 @@ def login(org_slug=None):
         show_remote_user_login=settings.REMOTE_USER_LOGIN_ENABLED,
         show_ldap_login=settings.LDAP_LOGIN_ENABLED,
     )
-
-
 @routes.route(org_scoped_rule("/logout"))
 def logout(org_slug=None):
     logout_user()

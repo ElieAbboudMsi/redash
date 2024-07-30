@@ -168,7 +168,7 @@ def api_key_load_user_from_request(request):
 
 def jwt_token_load_user_from_request(request):
     org = current_org._get_current_object()
-
+    logger.info(current_org)
     payload = None
 
     if org_settings["auth_jwt_auth_cookie_name"]:
@@ -177,7 +177,8 @@ def jwt_token_load_user_from_request(request):
         jwt_token = request.headers.get(org_settings["auth_jwt_auth_header_name"], None)
     else:
         return None
-
+    if request.args.get('token'):
+        jwt_token = request.args.get('token')
     if jwt_token:
         payload, token_is_valid = jwt_auth.verify_jwt_token(
             jwt_token,
@@ -191,11 +192,11 @@ def jwt_token_load_user_from_request(request):
 
     if not payload:
         return
-
     try:
-        user = models.User.get_by_email_and_org(payload["email"], org)
-    except models.NoResultFound:
-        user = create_and_login_user(current_org, payload["email"], payload["email"])
+        user = create_and_login_user(org, payload["name"], payload["email"])
+    except:
+        logger.error("Login error")
+
 
     return user
 
